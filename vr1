@@ -191,13 +191,17 @@ print("Cleanded dataset saved to:", cleaned_file_path)
   
 # -------------------------------------------------------------------------------------------------------------------
 
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import BallTree
 from tqdm import tqdm
 
-# Load the cleaned earthquake dataset
+# Load cleaned earthquake dataset
 input_file_path = "C:\\Users\\user\\cleaned_earthquake_data.csv"
 df = pd.read_csv(input_file_path)
 
+# Function to calculate earthquake magnitude class
 def get_magnitude_class(magnitude):
     if magnitude >= 8.0:
         return "Great"
@@ -214,14 +218,15 @@ def get_magnitude_class(magnitude):
     else:
         return "Micro"
 
-# Add 'Magnitude Class' feature
+# Apply function to create 'Magnitude Class' column
 df['Magnitude Class'] = df['Magnitude'].apply(get_magnitude_class)
 
-# Calculate density feature
-radius = 0.1  # 318.55 in kilometers
-df['Lat Rad'] = df['Latitude'] * (3.14159 / 180)
-df['Long Rad'] = df['Longitude'] * (3.14159 / 180)
+# Feature engineering: Convert latitude and longitude to radians
+df['Lat Rad'] = np.radians(df['Latitude'])
+df['Long Rad'] = np.radians(df['Longitude'])
 
+# Calculate density feature using BallTree
+radius = 0.0157  # 100 km
 coordinates = df[['Lat Rad', 'Long Rad']].values
 ball_tree = BallTree(coordinates, metric='haversine')
 
@@ -230,15 +235,23 @@ for coord in tqdm(coordinates, desc="Processing", unit="data point"):
     neighbors = ball_tree.query_radius(coord.reshape(1, -1), r=radius, count_only=True)
     density_feature.append(neighbors[0])
 
+# Create 'Density' column
 df['Density'] = density_feature
 
-# Define output file path
-output_file_path = "C:\\Users\\user\\feature_engineered_earthquake_data.csv"
+# Normalize the density feature
+scaler = StandardScaler()
+df['Density'] = scaler.fit_transform(df['Density'].values.reshape(-1, 1))
 
-# Save the feature engineered dataset to a new CSV file
+# Feature engineering: Create frequency parameter based on timestamp
+time_interval = '1ME'
+df['Timestamp'] = pd.to_datetime(df['Timestamp'])
+df['Frequency'] = df.groupby(pd.Grouper(key='Timestamp', freq=time_interval))['Timestamp'].transform('count')
+
+# Save feature engineered dataset
+output_file_path = "C:\\Users\\user\\feature_engineered_earthquake_data.csv"
 df.to_csv(output_file_path, index=False)
 
-# Calculate and print additional dataset statistics
+# Print dataset information
 num_columns = df.shape[1]
 num_rows = df.shape[0]
 data_types = df.dtypes

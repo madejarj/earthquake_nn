@@ -1,0 +1,256 @@
+#SPECIFICATIONS
+
+import zipfile
+import pandas as pd
+
+# -------------------------------------------------------------------------------------------------------------------
+
+# This cell preprocesses the first dataset of earthquake data from
+# the U.S. National Earthquake Information Center (NEIC),
+# covering the years 1965 to 2016.
+
+# Extract the dataset from the zip file
+with zipfile.ZipFile('earthquake-database.zip', 'r') as zip_ref:
+    zip_ref.extractall('earthquake_dataset1')
+
+# Load the CSV file
+file_path = 'earthquake_dataset1/database.csv'
+data = pd.read_csv(file_path)
+
+# Retain only the specified columns
+columns_to_keep = ['Date', 'Time', 'Latitude', 'Longitude', 'Depth', 'Magnitude', 'Magnitude Type', 'Root Mean Square']
+data = data[columns_to_keep]
+
+# Convert date format handling errors gracefully
+data['Date'] = pd.to_datetime(data['Date'], errors='coerce')
+
+# Filter out NaT (parsing errors)
+data = data.dropna(subset=['Date'])
+
+# Convert the rest to the desired format
+data['Date'] = data['Date'].dt.strftime('%Y-%m-%d')
+
+# Save the preprocessed data to a new CSV file
+preprocessed_file_path = 'preprocessed_1965-2016_earthquake.csv'
+data.to_csv(preprocessed_file_path, index=False)
+
+print("Preprocessed data saved to:", preprocessed_file_path)
+
+# Load the preprocessed CSV file
+data = pd.read_csv(preprocessed_file_path)
+
+# Display number of columns and rows
+num_columns = data.shape[1]
+num_rows = data.shape[0]
+
+# Calculate dataset size
+dataset_size = data.memory_usage().sum() / (1024 * 1024)  # in MB
+
+# Display details
+print("Number of columns:", num_columns)
+print("Number of rows:", num_rows)
+print("Dataset size:", round(dataset_size, 2), "MB")
+
+# -------------------------------------------------------------------------------------------------------------------
+
+# This cell preprocesses the second dataset of earthquake data from
+# the U.S. Geological Survey-Earthquake Hazards Program (USGS-EHP),
+# covering the years 2000 to 2023.
+
+# Extract the dataset from the zip file
+with zipfile.ZipFile('earthquakes-2000-2023.zip', 'r') as zip_ref:
+    zip_ref.extractall('earthquake_dataset2')
+
+# Load the CSV file
+csv_file_path = 'earthquake_dataset2/earthquakes-2000-01-01-2023-02-12.csv'
+data = pd.read_csv(csv_file_path)
+
+# Parse 'time' column as datetime
+data['time'] = pd.to_datetime(data['time'])
+
+# Extract Date and Time components
+data['Date'] = data['time'].dt.strftime('%Y-%m-%d')
+data['Time'] = data['time'].dt.strftime('%H:%M:%S')
+
+# Retain only the specified columns
+columns_to_keep = ['Date', 'Time', 'latitude', 'longitude', 'depth', 'mag', 'magType', 'rms']
+data = data[columns_to_keep]
+
+# Rename columns
+data = data.rename(columns={'latitude': 'Latitude', 'longitude': 'Longitude', 
+                            'depth': 'Depth', 'mag': 'Magnitude', 
+                            'magType': 'Magnitude Type', 'rms': 'Root Mean Square'})
+
+# Capitalize all cells in the 'Magnitude Type' column
+data['Magnitude Type'] = data['Magnitude Type'].str.upper()
+
+# Save the preprocessed data to a new CSV file
+preprocessed_file_path = 'preprocessed_2000-2023_earthquake.csv'
+data.to_csv(preprocessed_file_path, index=False)
+
+print("Preprocessed data saved to:", preprocessed_file_path)
+
+# Load the preprocessed CSV file
+data = pd.read_csv(preprocessed_file_path)
+
+# Display number of columns and rows
+num_columns = data.shape[1]
+num_rows = data.shape[0]
+
+# Calculate dataset size
+dataset_size = data.memory_usage().sum() / (1024 * 1024)  # in MB
+
+# Display details
+print("Number of columns:", num_columns)
+print("Number of rows:", num_rows)
+print("Dataset size:", round(dataset_size, 2), "MB")
+
+# -------------------------------------------------------------------------------------------------------------------
+
+# Load the preprocessed CSV files
+file_path1 = r"C:\Users\user\preprocessed_1965-2016_earthquake.csv"
+file_path2 = r"C:\Users\user\preprocessed_2000-2023_earthquake.csv"
+data1 = pd.read_csv(file_path1)
+data2 = pd.read_csv(file_path2)
+
+# Combine the datasets
+merged_data = pd.concat([data1, data2], ignore_index=True)
+
+# Save the merged data to a new CSV file
+merged_file_path = r"C:\Users\user\merged_earthquake_data.csv"
+merged_data.to_csv(merged_file_path, index=False)
+
+# Display number of columns and rows
+num_columns = merged_data.shape[1]
+num_rows = merged_data.shape[0]
+
+# Calculate dataset size
+dataset_size = merged_data.memory_usage().sum() / (1024 * 1024)  # in MB
+
+# Display details
+print("Number of columns:", num_columns)
+print("Number of rows:", num_rows)
+print("Dataset size:", round(dataset_size, 2), "MB")
+
+# -------------------------------------------------------------------------------------------------------------------
+
+# Load the merged CSV file
+merged_file_path = r"C:\Users\user\merged_earthquake_data.csv"
+merged_data = pd.read_csv(merged_file_path)
+
+# Round off 'Latitude' and 'Longitude' columns to whole numbers temporarily
+merged_data_temp = merged_data.copy()
+merged_data_temp['Latitude'] = merged_data_temp['Latitude'].round().astype(int)
+merged_data_temp['Longitude'] = merged_data_temp['Longitude'].round().astype(int)
+
+# Check for duplicated rows based on 'Date', 'Time', 'Latitude', and 'Longitude' columns
+duplicates_mask = merged_data_temp.duplicated(['Date', 'Time', 'Latitude', 'Longitude'], keep='first')
+
+# Remove duplicates
+cleaned_data = merged_data[~duplicates_mask].copy()
+
+# Revert the 'Latitude' and 'Longitude' columns to original values
+cleaned_data['Latitude'] = merged_data['Latitude']
+cleaned_data['Longitude'] = merged_data['Longitude']
+
+# Handle missing values
+# Create timestamp for 'Date' and 'Time' columns
+cleaned_data['Timestamp'] = pd.to_datetime(cleaned_data['Date'] + ' ' + cleaned_data['Time'])
+
+# Remove 'Date' and 'Time' columns
+cleaned_data.drop(columns=['Date', 'Time'], inplace=True)
+
+# Reorder columns
+cleaned_data = cleaned_data[['Timestamp', 'Latitude', 'Longitude', 'Depth', 'Magnitude', 'Magnitude Type', 'Root Mean Square']]
+
+# Impute 'MW' for missing 'Magnitude Type'
+cleaned_data['Magnitude Type'] = cleaned_data['Magnitude Type'].fillna('MW')
+
+# Impute mean for missing 'Root Mean Square'
+rms_mean = cleaned_data['Root Mean Square'].mean()
+cleaned_data['Root Mean Square'] = cleaned_data['Root Mean Square'].fillna(rms_mean)
+
+# Save the deduplicated dataset to a new CSV file
+cleaned_file_path = r"C:\Users\user\cleaned_earthquake_data.csv"
+cleaned_data.to_csv(cleaned_file_path, index=False)
+
+# Calculate the new number of columns and rows
+num_columns = cleaned_data.shape[1]
+num_rows = cleaned_data.shape[0]
+
+# Calculate dataset size
+dataset_size = cleaned_data.memory_usage().sum() / (1024 * 1024)  # in MB
+
+print("Number of duplicates removed:", duplicates_mask.sum())
+print("New Number of columns:", num_columns)
+print("New Number of rows:", num_rows)
+print("Data Types of each column:")
+print(deduplicated_data.dtypes)
+print("Dataset size:", round(dataset_size, 2), "MB")
+print("Cleanded dataset saved to:", cleaned_file_path)
+  
+# -------------------------------------------------------------------------------------------------------------------
+
+from sklearn.neighbors import BallTree
+from tqdm import tqdm
+
+# Load the cleaned earthquake dataset
+input_file_path = "C:\\Users\\user\\cleaned_earthquake_data.csv"
+df = pd.read_csv(input_file_path)
+
+def get_magnitude_class(magnitude):
+    if magnitude >= 8.0:
+        return "Great"
+    elif 7.0 <= magnitude < 8.0:
+        return "Major"
+    elif 6.0 <= magnitude < 7.0:
+        return "Strong"
+    elif 5.0 <= magnitude < 6.0:
+        return "Moderate"
+    elif 4.0 <= magnitude < 5.0:
+        return "Light"
+    elif 3.0 <= magnitude < 4.0:
+        return "Minor"
+    else:
+        return "Micro"
+
+# Add 'Magnitude Class' feature
+df['Magnitude Class'] = df['Magnitude'].apply(get_magnitude_class)
+
+# Calculate density feature
+radius = 0.1  # 318.55 in kilometers
+df['Lat Rad'] = df['Latitude'] * (3.14159 / 180)
+df['Long Rad'] = df['Longitude'] * (3.14159 / 180)
+
+coordinates = df[['Lat Rad', 'Long Rad']].values
+ball_tree = BallTree(coordinates, metric='haversine')
+
+density_feature = []
+for coord in tqdm(coordinates, desc="Processing", unit="data point"):
+    neighbors = ball_tree.query_radius(coord.reshape(1, -1), r=radius, count_only=True)
+    density_feature.append(neighbors[0])
+
+df['Density'] = density_feature
+
+# Define output file path
+output_file_path = "C:\\Users\\user\\feature_engineered_earthquake_data.csv"
+
+# Save the feature engineered dataset to a new CSV file
+df.to_csv(output_file_path, index=False)
+
+# Calculate and print additional dataset statistics
+num_columns = df.shape[1]
+num_rows = df.shape[0]
+data_types = df.dtypes
+dataset_size = df.memory_usage().sum() / (1024 * 1024)  # in MB
+
+print("Number of columns:", num_columns)
+print("Number of rows:", num_rows)
+print("Data Types of each column:")
+print(data_types)
+print("Dataset size:", round(dataset_size, 2), "MB")
+print("Feature engineered dataset saved to:", output_file_path)
+
+# -------------------------------------------------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------------------------------------------------
